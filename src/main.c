@@ -1,4 +1,5 @@
 #include "input.h"
+#include "logger.h"
 #include "output.h"
 #include "zilo.h"
 #include "terminal.h"
@@ -8,11 +9,15 @@
 
 editor_config_t E;
 
+/**
+ * @brief Initialize editor state.
+ */
 void init_editor(void) {
   E.cx = 0;
   E.cy = 0;
 
-  if (get_window_size(&E.screenrows, &E.screencols) == -1) die("get_window_size");
+  if (get_window_size(&E.screenrows, &E.screencols) == -1) 
+    LOG_WARN("get_window_size", "Unable to obtain terminal size, default value used.");
 
   E.rowoff = 0;
   E.coloff = 0;
@@ -24,12 +29,50 @@ void init_editor(void) {
   E.mode = MODE_NORMAL;
 }
 
+/**
+ * @brief Free editor memory resources.
+ */
+void free_editor(void) {
+  free(E.filename);
+
+  for (int i = 0; i < E.numrows; ++ i) {
+    erow_t *row = &E.row[i];
+    free(row->chars);
+  }
+
+  free(E.row);
+}
+
+/**
+ * @brief The cleanup function before program exit.
+ *
+ * This function is registered with 'atexit()' and does not need to be called manually.
+ */
+void editor_cleanup(void) {
+  // Restore the cursor shape to a block
+  set_cursor_shape_block();
+
+  // Restore terminal properties
+  disable_raw_mode();
+
+  // Free heap memory
+  free_editor();
+
+  // Close the log system
+  LOG_INFO("", "Zilo editor exited safely.");
+  zilo_log_close();
+}
+
+// Main logic
 int main(int argc, char *argv[]) {
   if (argc != 2) {
     fprintf(stderr, "usage: zilo <filenname>\n");
     fprintf(stderr, "If the file does not exist, a new file will be created.\n");
     return 1;
   }
+
+  zilo_log_init("zilo.log");
+  LOG_INFO("main", "Zilo editor started.");
 
   char *filenmae = argv[1];
 

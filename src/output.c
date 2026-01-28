@@ -119,6 +119,12 @@ void editor_refresh_screen(void) {
   // from the previous cursor position, leaving residual characters on the left side.
   ab_append(&ab, ANSI_CURSOR_HOME, strlen(ANSI_CURSOR_HOME));
   editor_draw_rows(&ab);
+
+  if (E.mode == MODE_INSERT) {
+    ab_append(&ab, ANSI_CURSOR_SHAPE_BAR, strlen(ANSI_CURSOR_SHAPE_BAR));
+  } else {
+    ab_append(&ab, ANSI_CURSOR_SHAPE_BLOCK, strlen(ANSI_CURSOR_SHAPE_BLOCK));
+  }
   ab_append(&ab, ANSI_CURSOR_SHOW, strlen(ANSI_CURSOR_SHOW));
 
   char buf[32];

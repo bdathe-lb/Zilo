@@ -1,5 +1,6 @@
 # The name of the final executable
 TARGET_EXEC := zilo
+TARGET_FILE ?= zilo.log
 
 # Directory definition
 SRC_DIR := src
@@ -8,7 +9,7 @@ BUILD_DIR := build
 
 # Comiler and related options
 CC := gcc
-CFLAGS := -I$(INC_DIR) -Wall -Wextra -O0 -g -MMD -MP -pedantic -std=c11
+CFLAGS := -I$(INC_DIR) -Wall -Wextra -O0 -g -MMD -MP
 LDFLAGS := 
 
 # Automated inference
@@ -52,7 +53,7 @@ mem-check:
 		--leak-check=full \
 		--show-leak-kinds=all \
 		--track-origins=yes \
-		./$(BUILD_DIR)/$(TARGET_EXEC)
+		./$(BUILD_DIR)/$(TARGET_EXEC) $(TARGET_FILE)
 
 # Clean
 clean:

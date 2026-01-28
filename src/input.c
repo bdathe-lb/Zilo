@@ -1,4 +1,6 @@
 #include "input.h"
+#include "edit.h"
+#include "file.h"
 #include "terminal.h"
 #include "zilo.h"
 #include <stdlib.h>
@@ -18,7 +20,7 @@ static void cursor_move(char c) {
     case 'l':  // Right
       // The cursor only moves if row exists 
       // and cursor is not at the end of the line
-      if (row && E.cx < row->size - 1) E.cx ++;
+      if (row && E.cx < row->size) E.cx ++;
       break;
     case 'k':  // Up
       if (E.cy > 0) E.cy --;
@@ -57,11 +59,16 @@ static void cursor_move(char c) {
 static void process_keypress_normal(char c) {
   if (c == 'q') exit(0);
   else if (c == 'i') E.mode = MODE_INSERT; 
+  else if (c == CTRL_KEY('s')) editor_save();
+  else if (c == 'x') editor_del_current_char();
   else if (c == 'h' || c == 'j' || c == 'k' || c == 'l') cursor_move(c);
 }
 
 static void process_keypress_insert(char c) {
   if (c == 27) E.mode = MODE_NORMAL;
+  else if (c == '\r' || c == 13) editor_insert_newline();
+  else if (c == 127 || c == 8) editor_del_left_char();
+  else editor_insert_char(c);
 }
 
 // Handling key input.

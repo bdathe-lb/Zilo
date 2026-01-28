@@ -35,4 +35,10 @@ extern editor_config_t E;
 // Initialize editor state.
 void init_editor(void);
 
+// Free editor resources.
+void free_editor(void);
+
+// The cleanup function before program exit.
+void editor_cleanup(void);
+
 #endif // !ZILO_ZILO_H

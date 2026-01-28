@@ -1,25 +1,13 @@
 #include "terminal.h"
+#include "logger.h"
 #include "zilo.h"
-#include <asm-generic/ioctls.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/fcntl.h>
-
-/**
- * @brief Prints error messages and exists the program.
- *
- * @param s Location of the error.
- */
-void die(const char *s) {
-  if (!s) return;
-
-  perror(s);
-  exit(1);
-}
 
 /**
  * @brief Enable terminal 'Raw' mode.
@@ -36,11 +24,17 @@ void enable_raw_mode(void) {
 
   // 1. Save the current attributes
   ret = tcgetattr(STDIN_FILENO, &E.orig_termios);
-  if (ret != 0) die("tcgetattr");
+  if (ret == -1) {
+    LOG_ERROR("tcsetattr", "Failed to get the current terminal attributes.");
+    return;
+  }
 
   // 2. Register 'atexit(disable_raw_mode)'
-  ret = atexit(disable_raw_mode);
-  if (ret != 0) die("atexit");
+  ret = atexit(editor_cleanup);
+  if (ret != 0) {
+    LOG_ERROR("atexit", "Failed to register cleanup function.");
+    return;
+  }
 
   // 3. Copy the configuration and modify it
   raw = E.orig_termios;
@@ -59,7 +53,10 @@ void enable_raw_mode(void) {
 
   // 4. Apply new settings
   ret = tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-  if (ret != 0) die("tcsetattr");
+  if (ret == -1) {
+    LOG_ERROR("tcsetattr", "Failed to set terminal attributes.");
+    return;
+  }
 }
 
 /**
@@ -69,7 +66,21 @@ void disable_raw_mode(void) {
   // TCSAFLUSH: Discard input that has not yet been read,
   //            then apply the new attributes.
   int ret = tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios);
-  if (ret != 0) die("tcsetattr");
+  if (ret == -1) {
+    LOG_ERROR("tcsetattr", "Failed to restore terminal attributes.");
+    return;
+  }
+}
+
+/**
+ * @brief Set the cursor shape to block.
+ */
+void set_cursor_shape_block(void) {
+  int ret = write(STDOUT_FILENO, ANSI_CURSOR_SHAPE_BLOCK, strlen(ANSI_CURSOR_SHAPE_BLOCK));
+  if (ret == -1) {
+    LOG_ERROR("write", "Failed to set cursor shape to block.");
+    return;
+  }
 }
 
 /**
@@ -82,7 +93,7 @@ char editor_readkey(void) {
 
   while (1) {
     ssize_t n = read(STDIN_FILENO, &c, 1);
-    if (n == -1 && errno != EAGAIN) die("read");
+    if (n == -1 && errno != EAGAIN) LOG_ERROR("read", "Failed to read key.");
     if (n == 0) continue;
     if (n == 1) break;
   }
@@ -122,7 +133,12 @@ int get_window_size(int *rows, int *cols) {
     close(tty);
   }
 
-  if (!ok) return -1;
+  if (!ok) {
+    // Set a default value
+    *rows = 80;
+    *cols = 60;
+    return -1;
+  }
 
   *rows = ws.ws_row;
   *cols = ws.ws_col;
