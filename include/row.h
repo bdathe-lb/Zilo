@@ -16,7 +16,7 @@ void editor_row_remove_char(erow_t *row, int at);
 // Concatenate the string to the end of row.
 void editor_row_append_string(erow_t *row, char *s, size_t len);
 
-// Release memory for one row (used for deleting a row).
+// Release memory for one row.
 void editor_free_row(erow_t *row);
 
 #endif // !ZILO_ROW_H

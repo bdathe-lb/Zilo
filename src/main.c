@@ -6,6 +6,8 @@
 #include "file.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 editor_config_t E;
 
@@ -27,6 +29,8 @@ void init_editor(void) {
 
   E.filename = NULL;
   E.mode = MODE_NORMAL;
+
+  editor_set_status_message("Welcome to Zilo.");
 }
 
 /**
@@ -57,6 +61,10 @@ void editor_cleanup(void) {
 
   // Free heap memory
   free_editor();
+
+  // Clean terminal
+  write(STDOUT_FILENO, ANSI_CLEAR_SCREEN, strlen(ANSI_CLEAR_SCREEN));
+  write(STDOUT_FILENO, ANSI_CURSOR_HOME, strlen(ANSI_CURSOR_HOME));
 
   // Close the log system
   LOG_INFO("", "Zilo editor exited safely.");

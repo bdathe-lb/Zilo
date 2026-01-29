@@ -19,4 +19,6 @@ void editor_del_left_char(void);
 // Delete the current cursor position character (Normal mode 'x' logic).
 void editor_del_current_char(void);
 
+// Delete the specify row. (Normal mdoe 'dd' logic)
+
 #endif // !ZILO_EDIT_H

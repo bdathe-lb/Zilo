@@ -57,18 +57,31 @@ static void cursor_move(char c) {
 }
 
 static void process_keypress_normal(char c) {
-  if (c == 'q') exit(0);
-  else if (c == 'i') E.mode = MODE_INSERT; 
-  else if (c == CTRL_KEY('s')) editor_save();
-  else if (c == 'x') editor_del_current_char();
-  else if (c == 'h' || c == 'j' || c == 'k' || c == 'l') cursor_move(c);
+  if      (c == 'q')            { exit(0); }
+  else if (c == 'i')            { E.mode = MODE_INSERT; }
+  else if (c == 'R')            { E.mode = MODE_REPLACE; }
+  else if (c == CTRL_KEY('s'))  { editor_save(); }
+  else if (c == 'x')            { editor_del_current_char(); }
+  else if (c == 'h' ||
+           c == 'j' ||
+           c == 'k' ||
+           c == 'l')            { cursor_move(c); }
+  else if (c == 'A')            { E.cx = E.row[E.cy].size; E.mode = MODE_INSERT; }
+  else if (c == 'I')            { E.cx = 0; E.mode = MODE_INSERT; }
 }
 
 static void process_keypress_insert(char c) {
-  if (c == 27) E.mode = MODE_NORMAL;
-  else if (c == '\r' || c == 13) editor_insert_newline();
-  else if (c == 127 || c == 8) editor_del_left_char();
-  else editor_insert_char(c);
+  if (c == 27)            { E.mode = MODE_NORMAL; }
+  else if (c == '\r' ||
+           c == 13)       { editor_insert_newline(); }
+  else if (c == 127  ||
+           c == 8)        { editor_del_left_char(); }
+  else                    { editor_insert_char(c); }
+}
+
+static void process_keypress_replace(char c) {
+  if (c == 27)                      { E.mode = MODE_NORMAL; }
+  else if (E.cx < E.row[E.cy].size) { E.row[E.cy].chars[E.cx] = c; E.cx ++; }
 }
 
 // Handling key input.
@@ -76,8 +89,9 @@ void editor_process_keypress(void) {
   char c = editor_readkey(); 
 
   switch (E.mode) {
-    case MODE_NORMAL: process_keypress_normal(c); break;
-    case MODE_INSERT: process_keypress_insert(c); break;
+    case MODE_NORMAL:  process_keypress_normal(c);   break;
+    case MODE_INSERT:  process_keypress_insert(c);   break;
+    case MODE_REPLACE: process_keypress_replace(c);  break;
     default: break;
   }
 }

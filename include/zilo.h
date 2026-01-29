@@ -2,10 +2,12 @@
 #define ZILO_ZILO_H
 
 #include <termios.h>
+#include <time.h>
 
 typedef enum {
-  MODE_NORMAL,
-  MODE_INSERT
+  MODE_NORMAL = 0,
+  MODE_INSERT,
+  MODE_REPLACE
 } editor_mode_e;
 
 typedef struct {
@@ -24,6 +26,9 @@ typedef struct {
 
   int numrows;    // The total row number of file
   erow_t *row;    // The row array pointer
+
+  char statusmsg[80];           // Store messages string
+  time_t statusmsg_time;        // Message timestamp
 
   char *filename;               // The currently opened file (heap memory)
   editor_mode_e mode;           // The current mode

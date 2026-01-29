@@ -1,3 +1,4 @@
+#include "output.h"
 #define _POSIX_C_SOURCE 200809L
 
 #include "file.h"
@@ -112,6 +113,9 @@ void editor_save(void) {
 
   // Write to disk
   if (write(fd, buf, len) == -1) LOG_ERROR("write", "Failed to write data to file <%s>.", E.filename);
+
+  // Set a message 
+  editor_set_status_message("The file <%s> has been saved to disk.", E.filename);
 
   free(buf);
   close(fd);
