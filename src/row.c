@@ -79,6 +79,21 @@ void editor_row_remove_char(erow_t *row, int at) {
 }
 
 /**
+ * @brief Remove all characters within a range from the line.
+ *
+ * @param row   Pointer to row object.
+ * @param start The starting index of the range to be deleted.
+ * @param len   The length of to the characters to be deleted.
+ */
+void editor_row_remove_range(erow_t *row, int start, int len) {
+  if (start < 0 || start >= row->size) return;
+  if (len < 0 || len > row->size - start) return;
+
+  memmove(row->chars + start, row->chars + start + len, row->size - start - len);
+  row->size -= len;
+}
+
+/**
  * @brief Concatenate the string to the end of row.
  *
  * @param row A row object that requires appending a string.

@@ -13,6 +13,9 @@ void editor_row_insert_char(erow_t *row, int at, int c);
 // Remove the character `c` at position `at` in row.
 void editor_row_remove_char(erow_t *row, int at);
 
+// Remove all characters within a range from the line.
+void editor_row_remove_range(erow_t *row, int start, int len);
+
 // Concatenate the string to the end of row.
 void editor_row_append_string(erow_t *row, char *s, size_t len);
 

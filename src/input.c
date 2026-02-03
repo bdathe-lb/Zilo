@@ -1,6 +1,6 @@
 #include "input.h"
 #include "edit.h"
-#include "file.h"
+#include "ops.h"
 #include "terminal.h"
 #include "zilo.h"
 #include <stdlib.h>
@@ -20,7 +20,7 @@ static void cursor_move(char c) {
     case 'l':  // Right
       // The cursor only moves if row exists 
       // and cursor is not at the end of the line
-      if (row && E.cx < row->size) E.cx ++;
+      if (row && E.cx < row->size - 1) E.cx ++;
       break;
     case 'k':  // Up
       if (E.cy > 0) E.cy --;
@@ -57,41 +57,134 @@ static void cursor_move(char c) {
 }
 
 static void process_keypress_normal(char c) {
-  if      (c == 'q')            { exit(0); }
+  if      (c == 'q')            { editor_op_exit(); }
   else if (c == 'i')            { E.mode = MODE_INSERT; }
+  else if (c == 'r')            { E.mode = MODE_REPLACE_ONCE; }
   else if (c == 'R')            { E.mode = MODE_REPLACE; }
-  else if (c == CTRL_KEY('s'))  { editor_save(); }
-  else if (c == 'x')            { editor_del_current_char(); }
+  else if (c == 'v')            { E.mode = MODE_VISUAL; E.select_cy = E.cy; E.select_cx = E.cx; }
+  else if (c == 'V')            { E.mode = MODE_VISUAL_LINE; E.select_cy = E.cy; }
+  else if (c == CTRL_KEY('v'))  { E.mode = MODE_VISUAL_BLOCK;E.select_cy = E.cy; E.select_cx = E.cx; }
+  else if (c == '0')            { editor_op_return_bol(); }
+  else if (c == '$')            { editor_op_return_eol(); }
+  else if (c == 'd')            { editor_op_delete_current_row(); }
+  else if (c == 'g')            { editor_op_goto_top(); }
+  else if (c == 'G')            { editor_op_goto_bottom(); }
+  else if (c == 'x')            { editor_op_del_current_char(); }
+  else if (c == 'o')            { editor_op_open_below(); }
+  else if (c == 'O')            { editor_op_open_above(); }
+  else if (c == 'A')            { editor_op_append_eol(); }
+  else if (c == 'I')            { editor_op_insert_bol(); }
+  else if (c == CTRL_KEY('s'))  { editor_op_save_file(); }
   else if (c == 'h' ||
            c == 'j' ||
            c == 'k' ||
            c == 'l')            { cursor_move(c); }
-  else if (c == 'A')            { E.cx = E.row[E.cy].size; E.mode = MODE_INSERT; }
-  else if (c == 'I')            { E.cx = 0; E.mode = MODE_INSERT; }
 }
 
 static void process_keypress_insert(char c) {
   if (c == 27)            { E.mode = MODE_NORMAL; }
   else if (c == '\r' ||
-           c == 13)       { editor_insert_newline(); }
+           c == 13)       { editor_op_insert_newline(); }
   else if (c == 127  ||
-           c == 8)        { editor_del_left_char(); }
+           c == 8)        { editor_op_del_left_char(); }
   else                    { editor_insert_char(c); }
 }
 
 static void process_keypress_replace(char c) {
-  if (c == 27)                      { E.mode = MODE_NORMAL; }
-  else if (E.cx < E.row[E.cy].size) { E.row[E.cy].chars[E.cx] = c; E.cx ++; }
+  // Press Esc, do nothing, and it will directly return to Normal Mode
+  if (c == 27) {
+    E.mode = MODE_NORMAL;
+    return;
+  }
+
+  // Get the current row
+  if (E.cy >= E.numrows) {
+    E.mode = MODE_NORMAL;
+  }
+
+  erow_t *row = &E.row[E.cy];
+ 
+  // If the cursor position exceeds the line length, it cannot be replaced
+  if (E.cx >= row->size) {
+    E.mode = MODE_NORMAL;
+    return;
+  }
+
+  row->chars[E.cx] = c;
+
+  E.cx ++;
+}
+
+static void process_keypress_replace_only(char c) {
+  // Press Esc, do nothing, and it will directly return to Normal Mode
+  if (c == 27) {
+    E.mode = MODE_NORMAL;
+    return;
+  }
+
+  // Get the current row
+  if (E.cy >= E.numrows) {
+    E.mode = MODE_NORMAL;
+  }
+
+  erow_t *row = &E.row[E.cy];
+
+  // If the cursor position exceeds the line length, it cannot be replaced
+  if (E.cx >= row->size) {
+    E.mode = MODE_NORMAL;
+    return;
+  }
+
+  row->chars[E.cx] = c;
+
+  E.mode = MODE_NORMAL;
+}
+
+static void process_keypress_visual(char c) {
+  // Press Esc, do nothing, and it will directly return to Normal Mode
+  if (c == 27) {
+    E.mode = MODE_NORMAL;
+    return;
+  }
+  else if (c == 'h' || c == 'j' ||
+           c == 'k' || c == 'l')   { cursor_move(c); }
+  else if (c == 'd' || c == 'x')   { editor_op_delete_visual(); }
+}
+
+static void process_keypress_visual_line(char c) {
+  // Press Esc, do nothing, and it will directly return to Normal Mode
+  if (c == 27) {
+    E.mode = MODE_NORMAL;
+    return;
+  }
+  else if (c == 'h' || c == 'j' ||
+           c == 'k' || c == 'l')   { cursor_move(c); }
+  else if (c == 'd' || c == 'x')   { editor_op_delete_visual_line(); }
+}
+
+static void process_keypress_visual_block(char c) {
+  // Press Esc, do nothing, and it will directly return to Normal Mode
+  if (c == 27) {
+    E.mode = MODE_NORMAL;
+    return;
+  }
+  else if (c == 'h' || c == 'j' ||
+           c == 'k' || c == 'l')   { cursor_move(c); }
+  else if (c == 'd' || c == 'x')   { editor_op_delete_visual_block(); }
 }
 
 // Handling key input.
 void editor_process_keypress(void) {
-  char c = editor_readkey(); 
+  char c = editor_readkey();
 
   switch (E.mode) {
-    case MODE_NORMAL:  process_keypress_normal(c);   break;
-    case MODE_INSERT:  process_keypress_insert(c);   break;
-    case MODE_REPLACE: process_keypress_replace(c);  break;
+    case MODE_NORMAL:        process_keypress_normal(c);       break;
+    case MODE_INSERT:        process_keypress_insert(c);       break;
+    case MODE_REPLACE:       process_keypress_replace(c);      break;
+    case MODE_REPLACE_ONCE:  process_keypress_replace_only(c); break;
+    case MODE_VISUAL:        process_keypress_visual(c);       break;
+    case MODE_VISUAL_LINE:   process_keypress_visual_line(c);  break;
+    case MODE_VISUAL_BLOCK:  process_keypress_visual_block(c); break;
     default: break;
   }
 }

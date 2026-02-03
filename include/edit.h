@@ -20,5 +20,6 @@ void editor_del_left_char(void);
 void editor_del_current_char(void);
 
 // Delete the specify row. (Normal mdoe 'dd' logic)
+void editor_del_row(int at);
 
 #endif // !ZILO_EDIT_H

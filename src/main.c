@@ -30,6 +30,11 @@ void init_editor(void) {
   E.filename = NULL;
   E.mode = MODE_NORMAL;
 
+  E.pending_key = 0;
+
+  E.select_cx = -1;
+  E.select_cy = -1;
+
   editor_set_status_message("Welcome to Zilo.");
 }
 

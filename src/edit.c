@@ -27,7 +27,6 @@ void editor_insert_char(int c) {
   E.cx ++;
 }
 
-
 /**
  * @brief Insert a new blank line at position `at`.
  *
@@ -128,4 +127,42 @@ void editor_del_current_char(void) {
   erow_t *row = &E.row[E.cy];
 
   editor_row_remove_char(row, E.cx);
+
+  if (E.cx == row->size) E.cx --;
+}
+
+/**
+ * @brief Delete the specify row. (Normal mdoe 'dd' logic).
+ *
+ * @param at Position of the deleted line.
+ */
+void editor_del_row(int at) {
+  // Cheeck `at` parameter
+  if (at < 0 || at >= E.numrows) return;
+
+  // Free characters array
+  editor_free_row(&E.row[at]);
+
+  // Move
+  memmove(&E.row[at], &E.row[at + 1], sizeof(erow_t) * (E.numrows - at - 1));
+
+  // Update
+  E.numrows --;
+
+  // Correct cursor
+  if (at == E.numrows) { // The last line
+    E.cy --;
+  }
+
+  // Get new line row object
+  if (E.cy == 0) {  // After deleting the file, it is empty
+    E.cx = 0;
+    return;
+  }
+
+  erow_t *row = &E.row[E.cy];
+  if (E.cx > row->size) {
+    E.cx = row->size;
+    return;
+  }
 }

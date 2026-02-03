@@ -4,10 +4,17 @@
 #include <termios.h>
 #include <time.h>
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 typedef enum {
   MODE_NORMAL = 0,
   MODE_INSERT,
-  MODE_REPLACE
+  MODE_REPLACE,
+  MODE_REPLACE_ONCE,
+  MODE_VISUAL,
+  MODE_VISUAL_LINE,
+  MODE_VISUAL_BLOCK,
 } editor_mode_e;
 
 typedef struct {
@@ -24,11 +31,16 @@ typedef struct {
   int screenrows; // Terminal row number
   int screencols; // Terminal column number
 
+  int select_cx;  // Selection start X
+  int select_cy;  // Selection start y
+
   int numrows;    // The total row number of file
   erow_t *row;    // The row array pointer
 
   char statusmsg[80];           // Store messages string
   time_t statusmsg_time;        // Message timestamp
+
+  char pending_key;             // Record key presses while waiting
 
   char *filename;               // The currently opened file (heap memory)
   editor_mode_e mode;           // The current mode

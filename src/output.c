@@ -11,11 +11,16 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 static const char *editor_mode_strings[] = {
   "NORMAL",
   "INSERT",
-  "REPLACE"
+  "REPLACE",
+  "O-REPLACE",
+  "VISUAL",
+  "L-VISUAL",
+  "B-VISUAL",
 };
 
 typedef struct abuf {
@@ -105,7 +110,7 @@ static void editor_draw_message_bar(abuf_t *ab) {
   if (E.statusmsg[0] == '\0') return;
 
   // Calculation display position: last line
-  int msg_row = E.screenrows - 1;
+  int msg_row = E.screenrows;
 
   // Move the cursor to the specified row, column 1
   char buf[32];
@@ -174,11 +179,7 @@ static void editor_draw_status_bar(abuf_t *ab) {
 
   // Calculate the number of spaces to fill
   if (lstatus_len > E.screencols) lstatus_len = E.screencols;
-  ab_append(ab, lstatus_buf, lstatus_len);
-
-  // Only begin drawing the right side when there is enough remaining space 
-  // to fit the right-side status bar.
-  // Otherwise, it will keep filling in spaces (equivalent to automatically 
+  ab_append(ab, lstatus_buf, lstatus_len); // Only begin drawing the right side when there is enough remaining space to fit the right-side status bar.
   // hiding the information on the right side when the window is too narrow).
   while (lstatus_len < E.screencols) {
     if (E.screencols - lstatus_len == rstatus_len) {
@@ -193,14 +194,54 @@ static void editor_draw_status_bar(abuf_t *ab) {
   ab_append(ab, ANSI_RESET, strlen(ANSI_RESET));
 }
 
+static bool is_in_visual_mode(void) {
+  return (E.mode == MODE_VISUAL || 
+          E.mode == MODE_VISUAL_LINE ||
+          E.mode == MODE_VISUAL_BLOCK);
+}
+
 /**
  * @brief Draw the logic for each row (tilde ~).
  *
  * @param ab Buffer.
  */
 static void editor_draw_rows(abuf_t *ab) {
+  // Marking highlight row range
+  int start_y = -1;
+  int end_y = -1;
+  int start_x = -1;
+  int end_x = -1;
+
+  if (is_in_visual_mode()) {
+    if (E.mode == MODE_VISUAL_LINE) {
+      start_y = MIN(E.cy, E.select_cy);
+      end_y = MAX(E.cy, E.select_cy);
+    } 
+    else if (E.mode == MODE_VISUAL_BLOCK) {
+      start_y = MIN(E.cy, E.select_cy);
+      end_y = MAX(E.cy, E.select_cy);
+      start_x = MIN(E.cx, E.select_cx);
+      end_x = MAX(E.cx, E.select_cx) + 1;
+    }
+    else if (E.mode == MODE_VISUAL) {
+      start_y = MIN(E.cy, E.select_cy);
+      end_y = MAX(E.cy, E.select_cy);
+
+      if (E.cy < E.select_cy) {
+        start_x = E.cx;
+        end_x = E.select_cx;
+      } else if (E.cy == E.select_cy) {
+        start_x = MIN(E.cx, E.select_cx);
+        end_x = MAX(E.cx, E.select_cx);
+      } else {
+        start_x = E.select_cx;
+        end_x = E.cx;
+      }
+    }
+  }
+
   // Loop
-  for (int y = 0; y < E.screenrows - 1; ++ y) {
+  for (int y = 0; y < E.screenrows; ++ y) {
     int filerow = y + E.rowoff;
     if (filerow >= E.numrows) {
       ab_append(ab, "~", 1);
@@ -208,26 +249,92 @@ static void editor_draw_rows(abuf_t *ab) {
       char *line = E.row[filerow].chars;
       int size = E.row[filerow].size;
 
-      // NOTE: Considering horizontal offset
-      // If coloff exceeds the line length, 
-      // it means that this line is invisible 
-      // in the current viewport and nothing should be drawn.
-      int len = 0;
-      if (size > E.coloff)
-        len = size - E.coloff;
-      if (len > E.screencols)
-        len = E.screencols;
+      // --- Core: Calculate highlight area ---
+      // The parts that need to be highlighted in this line
+      // [hl_start, hl_end]
+      int hl_start = -1, hl_end = -1;
 
-      if (len > 0)
-        ab_append(ab, line + E.coloff, len);
+      erow_t *row = &E.row[filerow];
+
+      // If in visual mode, and the current row is within the scope
+      if (is_in_visual_mode() && 
+          (filerow >= start_y && filerow <= end_y)) {
+        if (E.mode == MODE_VISUAL_LINE) {
+          hl_start = 0;
+          hl_end = row->size;
+        }
+        else if (E.mode == MODE_VISUAL_BLOCK) {
+          hl_start = start_x;
+          hl_end = end_x;
+        }
+        else if (E.mode == MODE_VISUAL) {
+          // Case A: The middle line
+          if (filerow > start_y && filerow < end_y) {
+            hl_start = 0;
+            hl_end = row->size;
+          } 
+          // Case B: Same line
+          else if (start_y == end_y) {
+            hl_start = start_x;
+            hl_end = end_x;
+          } 
+          // Case C: First line
+          else if (filerow == start_y) {
+            hl_start = start_x;
+            hl_end = row->size;
+          }
+          // Case D: Tail row
+          else if (filerow == end_y) {
+            hl_start = 0;
+            hl_end = end_x;
+          }
+        }
+      }
+
+      // --- Core: Rendering ---
+      // If there is no highlight, or the highlighted area is all to the left of `coloff`
+      if (hl_start == -1 || hl_end <= E.coloff) {
+        // NOTE: Considering horizontal offset
+        // If coloff exceeds the line length, 
+        // it means that this line is invisible 
+        // in the current viewport and nothing should be drawn.
+        int len = 0;
+        if (size > E.coloff) len = size - E.coloff;
+        if (len > E.screencols) len = E.screencols;
+
+        if (len > 0)
+          ab_append(ab, line + E.coloff, len);
+      }
+      else {
+        // --- First paragraph: Ordinary ---
+        if (hl_start > E.coloff) {
+          int len = hl_start - E.coloff;
+          ab_append(ab, row->chars + E.coloff, len);
+        }
+
+        // --- Second paragraph: Highlight ---
+        int actual_start = MAX(E.coloff, hl_start);
+        int max_screen_idx = E.coloff + E.screencols;
+        int actual_end = MIN(hl_end, max_screen_idx);
+
+        int len = actual_end - actual_start;
+        if (len > 0) {
+          ab_append(ab, ANSI_REVERSE_DISPLAY, strlen(ANSI_REVERSE_DISPLAY));
+          ab_append(ab, row->chars + E.coloff + actual_start, len);
+          ab_append(ab, ANSI_RESET, strlen(ANSI_RESET));
+        }
+
+        // --- Third paragraph: Ordinary ---
+        if (hl_end < row->size) {
+          int len = row->size - hl_end;
+          ab_append(ab, row->chars + hl_end, len);
+        }
+      }
     }
     
     // NOTE: Clear residual characters to the right of the cursor at the end of each line.
     ab_append(ab, ANSI_CLEAR_LINE, strlen(ANSI_CLEAR_LINE));
-    if (y < E.screenrows - 1) {
-      // If it's not the last line, add a newline character
-      ab_append(ab, "\r\n", 2);
-    }
+    ab_append(ab, "\r\n", 2);
   }
 }
 

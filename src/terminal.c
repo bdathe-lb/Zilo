@@ -140,7 +140,7 @@ int get_window_size(int *rows, int *cols) {
     return -1;
   }
 
-  *rows = ws.ws_row;
+  *rows = ws.ws_row - 1; // The bottom should be reserved for the status bar
   *cols = ws.ws_col;
   return 0;
 }
